@@ -1,0 +1,136 @@
+IF OBJECT_ID ('Calendar') is NOT NULL  DROP TABLE Calendar
+
+IF OBJECT_ID ('Reviews') is NOT NULL   DROP TABLE Reviews
+
+IF OBJECT_ID ('Bookings') is NOT NULL  DROP TABLE Bookings
+
+IF OBJECT_ID ('Listings') is NOT NULL 
+	SELECT * 
+	FROM sys.foreign_keys
+	WHERE referenced_object_id = object_id('Listings')
+	SELECT 
+    'ALTER TABLE [' +  OBJECT_SCHEMA_NAME(parent_object_id) +
+    '].[' + OBJECT_NAME(parent_object_id) + 
+    '] DROP CONSTRAINT [' + name + ']'
+	FROM sys.foreign_keys
+	WHERE referenced_object_id = object_id('Listings')
+	DROP TABLE Listings
+
+--####### CREATING TABLES #######
+
+CREATE TABLE Listings (id INT NOT NULL,
+						listing_url NVARCHAR(1000) NOT NULL,
+						name NVARCHAR(1000), 
+						number_of_bedrooms INT,
+						description NVARCHAR(1000),
+						cancellation_policy NVARCHAR(1000),
+						review_scores_value FLOAT(50),
+						reviews_per_month FLOAT(50),
+						host_id INT NOT NULL,
+						host_name NVARCHAR(1000),
+						PRIMARY KEY (id)
+						
+);
+
+CREATE TABLE Reviews (listing_id INT NOT NULL,
+						id INT NOT NULL,
+						comments NVARCHAR(3000),
+						PRIMARY KEY (id),
+);
+
+
+CREATE TABLE Bookings (id INT NOT NULL,
+						listing_id INT NOT NULL,
+						guest_name NVARCHAR(1000) NOT NULL,
+						stay_from DATE NOT NULL,
+						stay_to DATE NOT NULL,
+						number_of_guests INT NOT NULL,
+						PRIMARY KEY (id),
+);
+
+CREATE TABLE Calendar (listing_id INT NOT NULL, 
+						date DATE NOT NULL, 
+						available BIT NOT NULL, 
+						price FLOAT(20),
+						PRIMARY KEY (listing_id, date),
+);
+
+
+
+--######## ADD FOREIGN CONSTRAINTS + CONSTRAINTS ON DELETE AND UPDATE #######
+
+ALTER TABLE Calendar
+ADD FOREIGN KEY (listing_id)
+REFERENCES Listings(id)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION
+
+ALTER TABLE Bookings
+ADD FOREIGN KEY (listing_id)
+REFERENCES Listings(id)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION
+
+ALTER TABLE Reviews
+ADD FOREIGN KEY (listing_id)
+REFERENCES Listings(id)
+ON DELETE NO ACTION
+ON UPDATE NO ACTION
+
+
+--######## INSERT INTO TABLES #######
+-- The CSV files were imported to the database as listings1, reviews2, calendar1. There's no data for bookings
+
+INSERT INTO Listings
+SELECT id,listing_url,name,number_of_bedrooms,description,cancellation_policy,review_scores_value,reviews_per_month,
+		host_id,host_name 
+FROM listings1
+--SELECT * FROM Listings
+
+
+INSERT INTO Calendar
+SELECT listing_id, date, available, price
+FROM calendar1
+--SELECT * FROM Calendar
+
+
+INSERT INTO Reviews
+SELECT listing_id, id, comments
+FROM reviews2
+--SELECT * FROM Reviews
+
+ALTER TABLE Reviews
+ADD guest_name NVARCHAR(1000) NOT NULL
+CONSTRAINT value_default DEFAULT ('name')
+WITH VALUES;
+GO
+
+CREATE TRIGGER booking_cal_trig 
+ON Bookings 
+AFTER INSERT AS 
+BEGIN 
+UPDATE C SET available=0 
+from Calendar as C INNER JOIN inserted as i on C.listing_id=i. listing_id 
+where i.stay_from <= C.date and C.date <= i.stay_to 
+END
+
+GO
+CREATE TRIGGER add_review 
+ON Reviews 
+INSTEAD OF INSERT AS 
+BEGIN 
+IF (SELECT COUNT (*) 
+	FROM INSERTED, Bookings 
+	WHERE (INSERTED.listing_id = Bookings.listing_id) AND (INSERTED.guest_name= Bookings.guest_name) AND (GETDATE() > Bookings.stay_to)) > 0 
+	
+	BEGIN INSERT INTO Reviews(listing_id, id, comments,guest_name) 
+	SELECT * 
+	FROM INSERTED 
+	END 
+
+ELSE 
+	BEGIN 
+	RAISERROR ('Can only review the listing after the stay and if you did not book it', 10, 1) 
+	ROLLBACK TRANSACTION 
+	END 
+END
