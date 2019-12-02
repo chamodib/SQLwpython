@@ -36,7 +36,7 @@ in a trigger, your program should print the trigger’s error message and let th
 that the review was not stored. 
 
 
-Some important points:  
+Some important points regarding the code:  
 1. The database has all the data from CSV files and triggers for booking and reviewing implemented. 
 2. Everything loops back to the main user prompt asking them to choose to search, book or review listings. Although you can book or review thing directly, it is recommended to ALWAYS search listings before booking or reviewing to reduce errors.   
 3. Although error handling is written in, some things were not handled. For example, entering a different type of variable (string) instead of a (int). It will throw an error and shut down program. However you CAN leave things blank. More information is provided in sections below. 
