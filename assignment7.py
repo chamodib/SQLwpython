@@ -10,12 +10,12 @@ import pyodbc
 import datetime
 
 
-conn = pyodbc.connect('driver={SQL Server};Server=cypress.csil.sfu.ca;Trusted_Connection=yes;')
+conn = pyodbc.connect('driver={SQL Server};Server="";Trusted_Connection=yes;')
 
 cur = conn.cursor()
 
 # to validate the connection
-cur.execute('SELECT username,password from dbo.helpdesk')
+cur.execute('SELECT username,password from ""')
 
 
 loop = 1
